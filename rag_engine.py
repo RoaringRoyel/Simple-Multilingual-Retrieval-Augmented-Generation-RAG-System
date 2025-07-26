@@ -1,54 +1,90 @@
-# app.py
-
-from flask import Flask, request, jsonify, render_template
-from rag_engine import retrieve_answer
-import csv
-import os
-app = Flask(__name__)
-
-LOG_FILE = "query_answer_log.csv"
-chat_history = []
-
-def log_query_answer(query, answer):
-    file_exists = os.path.isfile(LOG_FILE)
-    with open(LOG_FILE, mode='a', encoding='utf-8', newline='') as f:
-        writer = csv.writer(f)
-        if not file_exists:
-            writer.writerow(["query", "answer"])  # header
-        writer.writerow([ query, answer])
+import requests
+import faiss
+import pickle
+import numpy as np
+from sentence_transformers import SentenceTransformer
 
 
-@app.route("/")
-def index():
-    return render_template("index.html")
-@app.route("/ask", methods=["POST"])
-def ask():
-    global chat_history
-    data = request.get_json()
-    query = data.get("query", "").strip()
+def build_prompt(context, question, chat_context=""):
+    prompt = f"""
+    তুমি একজন সহায়ক বাংলা সহকারী।
 
-    if not query:
-        return jsonify({"error": "Query cannot be empty."}), 400
+    তোমাকে একটি প্রশ্ন এবং কিছু প্রাসঙ্গিক তথ্য (context) দেওয়া হবে।
 
-    # Append query to history
-    chat_history.append({"role": "user", "content": query})
+    ✅ কেবল context-এ যেটা আছে, সেটাই বলবে। অনুমান বা বাহিরের তথ্য ব্যবহার করা যাবে না।
 
-    llm_answer, top_chunks = retrieve_answer(query)
+    ❌ যদি context-এ প্রশ্নের উত্তর না থাকে, তাহলে বলবে: "আমি দুঃখিত, আমি এই প্রশ্নের উত্তর খুঁজে পাইনি।"
 
-    # Append answer to history
-    chat_history.append({"role": "assistant", "content": llm_answer})
+    📝 উত্তরটি সংক্ষিপ্ত এবং স্পষ্ট হওয়া উচিত। দয়া করে মাত্র প্রয়োজনীয় তথ্যই দাও।
 
-    # Construct short-term context string
-    short_term_context = ""
-    for turn in chat_history[-4:]:  # last 2 user/assistant turns
-        role = "User" if turn["role"] == "user" else "Bot"
-        short_term_context += f"{role}: {turn['content']}\n"
+    ---
 
-    return jsonify({
-        "query": query,
-        "answer": llm_answer,
-        "top_chunks": top_chunks
-    })
+    পূর্বের কথোপকথন:
+    {chat_context}
 
-if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    📚 প্রাসঙ্গিক তথ্য:
+    {context}
+
+    ❓ প্রশ্ন:
+    {question}
+
+    ✅ উত্তর:
+    """
+    return prompt
+
+
+
+def call_ollama_llm(prompt, model="mistral"):
+    response = requests.post(
+        "http://localhost:11434/api/generate",
+        json={
+        "model": model,
+        "prompt": prompt,
+        "max_tokens": 100,
+        "temperature": 0.7,
+        "stream": False
+        }
+    )
+    if response.ok:
+        return response.json().get("response", "").strip()
+    else:
+        print(f"LLM HTTP Error {response.status_code}: {response.text}")
+        return "Error in LLM CALL"
+
+def load_index_and_chunks(index_path="faiss.index", chunk_path="chunks.pkl"):
+    index = faiss.read_index(index_path)
+    with open(chunk_path, "rb") as f:
+        chunks = pickle.load(f)
+    return index, chunks
+
+# Embed the user query
+def embed_query(query, model_name="distiluse-base-multilingual-cased-v2"):
+    model = SentenceTransformer(model_name, device="cuda")
+    q_vec = model.encode([query], convert_to_numpy=True)
+    q_vec = q_vec / np.linalg.norm(q_vec, axis=1, keepdims=True)  # normalize along axis=1  # Normalize for cosine similarity
+    return q_vec
+
+def shorten_answer(answer, max_sentences=2):
+    sentences = answer.split('।') 
+    short_answer = '।'.join(sentences[:max_sentences]).strip()
+    if not short_answer.endswith('।'):
+        short_answer += '।'
+    return short_answer
+
+def retrieve_answer(query, top_k=20):
+    index, chunks = load_index_and_chunks()
+    q_vec = embed_query(query)
+    D, I = index.search(q_vec, top_k)
+    threshold = 0.7
+    top_chunks = [chunks[i] for i, score in zip(I[0], D[0]) if score > threshold]
+
+    print("Similarity Scores:", D[0])
+    context = "\n\n".join(top_chunks)
+    print("🔍 Retrieved Chunks:\n")
+    for i, chunk in enumerate(top_chunks):
+        print(f"[Chunk {i+1}]\n{chunk}\n")
+    prompt = build_prompt(context, query)
+    llm_answer = call_ollama_llm(prompt)
+    llm_answer_short = shorten_answer(llm_answer, max_sentences=2)
+
+    return llm_answer_short, top_chunks
