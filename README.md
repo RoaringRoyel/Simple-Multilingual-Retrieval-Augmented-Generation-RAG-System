@@ -92,9 +92,11 @@ I used paraphrase-multilingual-MiniLM-L12-v2 from sentence-transformers because 
 Embeddings are normalized and compared using cosine similarity via FAISS.IndexFlatIP. This ensures fast top-k retrieval. 
 
 5. 🤝 How do you ensure meaningful comparison of queries and chunks?
-Both queries and chunks are embedded in the same semantic space, and I avoid over-filtering short answers during chunking. Queries are taken from the UI and send to rag_engine and the function retrieve_answer is triggered. Maintaining a threshhold of 0.7 for cosine similarity to take only the chunks are related to the context. Also in the terminal, the similirity scores are printed to ease the hypertuning for future work. Also, to check relavnace of the selected chunks in terminal they are printed. 
+Both queries and chunks are embedded in the same semantic space, and I avoid over-filtering short answers during chunking. Queries are taken from the UI and send to rag_engine and the function retrieve_answer is triggered. Maintaining a threshhold of 0.7 for cosine similarity to take only the chunks are related to the context. Also in the terminal, the similirity scores are printed to ease the hypertuning for future work. Also, to check relavnace of the selected chunks in terminal they are printed.
+Here is screenshot :  
+![Screenshot 3](ss3.jpg)
 
-6. 📈 Do the results seem relevant? What would improve them?
+7. 📈 Do the results seem relevant? What would improve them?
 Mostly No. Cheching the logs the similarity are around 60-90 for most of the time. But sometimes it go toward 40% as well. Hypertuning threshhold and sliding window, context_size with top_k [ not too much, as too much will create extra context ]. Need more tuning for the task. Also, often the RAG shows hallucination.
 
 Trying llama2:7b-chat increases the hallucination
@@ -103,9 +105,17 @@ more try on ollama or GPT model needs to be tried here for fine-tuning.
 
 The data pre-processing issue is already mentioned avobe.
 Also when embedding extra tag can help.
-
-
 Phrase-level chunking in dense parts
+
+## Sample Output in the UI
+
+Here is screenshot 1:  
+![Screenshot 1](ss1.jpg)
+
+Here is screenshot 2:  
+![Screenshot 2](ss2.jpg)
+
+
 ## 📦 Setup Instructions
 
 ### 1. 📁 Clone & Install Dependencies
