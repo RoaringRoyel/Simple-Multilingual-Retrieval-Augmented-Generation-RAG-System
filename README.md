@@ -107,6 +107,7 @@ The data pre-processing issue is already mentioned avobe.
 Also when embedding extra tag can help.
 Phrase-level chunking in dense parts
 
+Short term memory is been captured via promt {chat_context}
 ## Sample Output in the UI
 
 Here is screenshot 1:  
