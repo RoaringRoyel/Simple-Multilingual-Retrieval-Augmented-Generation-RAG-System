@@ -8,6 +8,7 @@ This is a simple Retrieval-Augmented Generation (RAG) system that supports both 
  │ └── index.html # Simple UI form to send queries 
  
  ├── static/ 
+ │ └── style.css # Styling for the frontend 
  
  ├── app.py # Flask API + route for UI 
  
@@ -18,9 +19,7 @@ This is a simple Retrieval-Augmented Generation (RAG) system that supports both 
  ├── index.faiss # FAISS vector index 
  
  │── chunks.pkl # Stored chunks 
- 
- │ └── style.css # Styling for the frontend 
- 
+  
  ├── HSC26-Bangla1st-Paper.pdf # Bangla textbook (dataset) 
  
  ├── requirements.txt # Python dependencies 
@@ -68,7 +67,10 @@ Retrieves relevant context from the Bangla textbook and generates a grounded ans
 {
   "query": "কাকে অনুপমের ভাগ্য দেবতা বলে উল্লেখ করা হয়েছে?"
 }
-Response Body (JSON)
+```
+#### 📥 Response Body (JSON)
+
+```json
 {
   "question": "কাকে অনুপমের ভাগ্য দেবতা বলে উল্লেখ করা হয়েছে?",
   "answer": "মামাকে",
